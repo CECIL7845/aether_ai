@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "apps.chat",
     "apps.usage",
     "apps.documents",
+    "apps.research",
 ]
 
 MIDDLEWARE = [
@@ -171,3 +172,15 @@ EMBEDDING_DIMENSIONS = 768  # fixed by the database column; changing it requires
 # Attached documents up to this size are sent to the model in full; larger ones use retrieval.
 FULL_CONTEXT_MAX_CHARS = env.int("FULL_CONTEXT_MAX_CHARS", default=60_000)
 RETRIEVAL_TOP_K = env.int("RETRIEVAL_TOP_K", default=8)
+
+# --- Web research ---
+SEARCH_PROVIDER = env("SEARCH_PROVIDER", default="tavily")  # "tavily" or "none"
+TAVILY_API_KEY = env("TAVILY_API_KEY", default="")
+WEB_SEARCH_RESULTS = env.int("WEB_SEARCH_RESULTS", default=5)
+WEB_SEARCHES_PER_DAY = env.int("WEB_SEARCHES_PER_DAY", default=50)
+WEB_FETCH_TIMEOUT_SECONDS = env.float("WEB_FETCH_TIMEOUT_SECONDS", default=10.0)
+WEB_FETCH_MAX_BYTES = env.int("WEB_FETCH_MAX_BYTES", default=3 * 1024 * 1024)
+WEB_FETCH_MAX_CHARS = env.int("WEB_FETCH_MAX_CHARS", default=200_000)
+WEB_MAX_CHARS_PER_PAGE = env.int("WEB_MAX_CHARS_PER_PAGE", default=5_000)
+# Never disable in production: blocks fetches to private/internal networks (SSRF protection).
+WEB_FETCH_BLOCK_PRIVATE_NETWORKS = env.bool("WEB_FETCH_BLOCK_PRIVATE_NETWORKS", default=True)

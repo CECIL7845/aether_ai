@@ -153,7 +153,7 @@ export function useChat(conversationId: number | null, { onTitle, onChanged }: O
   )
 
   const send = useCallback(
-    async (content: string, modelId: string, ensureConversation: () => Promise<number>) => {
+    async (content: string, modelId: string, ensureConversation: () => Promise<number>, webSearch = false) => {
       const userDraft = draft('user', content)
       setMessages((list) => [...list, userDraft])
       let convId: number
@@ -164,25 +164,25 @@ export function useChat(conversationId: number | null, { onTitle, onChanged }: O
         return (e as Error).message
       }
       if (conversationId === null) createdHereRef.current = convId
-      return run(convId, `/api/conversations/${convId}/messages/`, { content, model_id: modelId }, userDraft.id)
+      return run(convId, `/api/conversations/${convId}/messages/`, { content, model_id: modelId, web_search: webSearch }, userDraft.id)
     },
     [conversationId, run],
   )
 
   const regenerate = useCallback(
-    async (modelId: string) => {
+    async (modelId: string, webSearch = false) => {
       if (conversationId === null) return null
       setMessages((list) => {
         const lastUser = list.map((m) => m.role).lastIndexOf('user')
         return lastUser === -1 ? list : list.slice(0, lastUser + 1)
       })
-      return run(conversationId, `/api/conversations/${conversationId}/regenerate/`, { model_id: modelId }, null)
+      return run(conversationId, `/api/conversations/${conversationId}/regenerate/`, { model_id: modelId, web_search: webSearch }, null)
     },
     [conversationId, run],
   )
 
   const edit = useCallback(
-    async (messageId: number, content: string, modelId: string) => {
+    async (messageId: number, content: string, modelId: string, webSearch = false) => {
       if (conversationId === null) return null
       setMessages((list) => {
         const i = list.findIndex((m) => m.id === messageId)
@@ -191,7 +191,7 @@ export function useChat(conversationId: number | null, { onTitle, onChanged }: O
       return run(
         conversationId,
         `/api/conversations/${conversationId}/messages/${messageId}/edit/`,
-        { content, model_id: modelId },
+        { content, model_id: modelId, web_search: webSearch },
         null,
       )
     },

@@ -94,13 +94,15 @@ def _validate_content(data: dict) -> str | JsonResponse:
     return content
 
 
-def _stream(user, conversation, spec, extra_start: dict | None = None) -> StreamingHttpResponse:
+def _stream(user, conversation, spec, data: dict, extra_start: dict | None = None) -> StreamingHttpResponse:
+    web = data.get("web_search") is True
+
     async def events():
         if extra_start:
             from .services import sse
 
             yield sse("user_message", extra_start)
-        async for chunk in generate_reply(user, conversation, spec):
+        async for chunk in generate_reply(user, conversation, spec, web=web):
             yield chunk
 
     response = StreamingHttpResponse(events(), content_type="text/event-stream")
@@ -128,7 +130,7 @@ async def send_message(request, conversation_id: int):
     if conversation.title == DEFAULT_TITLE:
         conversation.title = title_from(content)
         await conversation.asave(update_fields=["title", "updated_at"])
-    return _stream(user, conversation, spec, {"id": message.pk, "content": content, "title": conversation.title})
+    return _stream(user, conversation, spec, data, {"id": message.pk, "content": content, "title": conversation.title})
 
 
 @require_POST
@@ -137,12 +139,12 @@ async def regenerate(request, conversation_id: int):
     prepared, error = await _prepare(request, conversation_id)
     if error:
         return error
-    user, conversation, spec, _ = prepared
+    user, conversation, spec, data = prepared
     last_user = await conversation.messages.filter(role=Message.Role.USER).order_by("-created_at", "-id").afirst()
     if last_user is None:
         return _error(400, "There is no message to regenerate a reply for.")
     await _delete_after(conversation, last_user)
-    return _stream(user, conversation, spec)
+    return _stream(user, conversation, spec, data)
 
 
 @require_POST
@@ -161,4 +163,4 @@ async def edit_message(request, conversation_id: int, message_id: int):
     message.content = content
     await message.asave(update_fields=["content"])
     await _delete_after(conversation, message)
-    return _stream(user, conversation, spec, {"id": message.pk, "content": content, "title": conversation.title})
+    return _stream(user, conversation, spec, data, {"id": message.pk, "content": content, "title": conversation.title})

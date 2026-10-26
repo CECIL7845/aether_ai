@@ -21,12 +21,24 @@ export type Message = {
   grounding?: GroundingInfo
 }
 
-export type SourceRef = { ref: string; document_id: number; title: string; location: string; snippet: string }
+export type SourceRef = {
+  ref: string
+  kind: 'document' | 'web'
+  document_id: number | null
+  url: string
+  title: string
+  location: string
+  retrieved: boolean
+  snippet: string
+}
+
+export type WebPage = { ref?: string; url: string; title: string; status: 'read' | 'snippet' | 'failed'; reason?: string }
 
 export type GroundingInfo = {
-  mode: 'full' | 'search' | 'none'
-  sources: SourceRef[]
-  skipped: { title: string; status: DocumentStatus }[]
+  mode?: 'full' | 'search' | 'none'
+  sources?: SourceRef[]
+  skipped?: { title: string; status: DocumentStatus }[]
+  web?: { query?: string; pages: WebPage[]; sources: SourceRef[]; error?: string }
 }
 
 export type DocumentStatus = 'queued' | 'processing' | 'ready' | 'failed'
@@ -76,7 +88,7 @@ export type ModelInfo = {
   available: boolean
 }
 
-export type ModelsResponse = { default: string | null; models: ModelInfo[] }
+export type ModelsResponse = { default: string | null; models: ModelInfo[]; features: { web_search: boolean } }
 
 export type UsageResponse = {
   allowed: boolean

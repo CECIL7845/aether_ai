@@ -17,7 +17,7 @@ from apps.providers.services import get_provider
 from apps.usage.models import UsageRecord
 from apps.usage.services import check_quota
 
-from .grounding import GROUNDING_INSTRUCTIONS, check_citations, ground
+from .grounding import check_citations, ground, instructions
 from .models import Conversation, Message
 
 logger = logging.getLogger(__name__)
@@ -38,8 +38,8 @@ def system_prompt() -> str:
     return (
         f"You are {settings.PRODUCT_NAME}, an AI assistant. Today's date is {date.today().isoformat()}.\n"
         "Be accurate and direct. If you are unsure or lack information, say so instead of guessing.\n"
-        "You cannot browse the web, open files, or take actions unless a tool result in this conversation "
-        "shows you did; never claim otherwise.\n"
+        "You cannot browse the web, open files, or take actions yourself. Source material is provided to you only "
+        "when the user enables web search or attaches documents; never claim to have looked something up otherwise.\n"
         "Format answers in Markdown. Put code in fenced code blocks with a language tag."
     )
 
@@ -87,7 +87,9 @@ async def check_rate(user_id: int) -> bool:
     return count <= settings.USER_GENERATIONS_PER_MINUTE
 
 
-async def generate_reply(user, conversation: Conversation, spec: ModelSpec) -> AsyncIterator[str]:
+async def generate_reply(
+    user, conversation: Conversation, spec: ModelSpec, *, web: bool = False
+) -> AsyncIterator[str]:
     """Stream SSE events for one assistant reply. Always ends with a `done` or `error` event."""
     quota = await check_quota(user)
     if not quota.allowed:
@@ -100,8 +102,8 @@ async def generate_reply(user, conversation: Conversation, spec: ModelSpec) -> A
         return
 
     history = await build_history(conversation, settings.MAX_CONTEXT_TOKENS)
-    history, sources, grounding = await ground(user, conversation, history)
-    system = system_prompt() + (GROUNDING_INSTRUCTIONS if grounding else "")
+    history, sources, grounding = await ground(user, conversation, history, web=web)
+    system = system_prompt() + instructions(grounding)
     assistant = await Message.objects.acreate(
         conversation=conversation, role=Message.Role.ASSISTANT, status=Message.Status.STREAMING, model_id=spec.id
     )

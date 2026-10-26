@@ -1,4 +1,4 @@
-import { Download, FileUp, MessageSquareText } from 'lucide-react'
+import { Download, FileUp, Globe, MessageSquareText } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { conversations, documents as documentsApi } from '../api/endpoints'
@@ -7,7 +7,7 @@ import { AttachMenu, AttachmentChips } from '../components/Attachments'
 import { Composer } from '../components/Composer'
 import { MessageItem } from '../components/MessageItem'
 import { ModelPicker } from '../components/ModelPicker'
-import { Spinner } from '../components/ui'
+import { IconButton, Spinner } from '../components/ui'
 import { useChat } from '../hooks/useChat'
 import { useToast } from '../lib/toast'
 
@@ -42,6 +42,9 @@ export function ChatView({
   const [attachedFor, setAttachedFor] = useState<number | null>(null)
   const [uploading, setUploading] = useState(0)
   const [dragging, setDragging] = useState(false)
+  const [webSearch, setWebSearch] = useState(false)
+  const webAvailable = models?.features.web_search ?? false
+  const useWeb = webSearch && webAvailable
   const [prevConversationId, setPrevConversationId] = useState(conversationId)
   if (prevConversationId !== conversationId) {
     // Switching chats: clear, unless this is the chat we just created from a new one (attachments carry over).
@@ -140,7 +143,7 @@ export function ChatView({
 
   const send = async (text: string) => {
     stickToBottom.current = true
-    return report(await chat.send(text, modelId, ensureConversation))
+    return report(await chat.send(text, modelId, ensureConversation, useWeb))
   }
 
   const lastAssistantId = [...chat.messages].reverse().find((m) => m.role === 'assistant')?.id
@@ -177,6 +180,15 @@ export function ChatView({
       toolbar={
         <>
           <AttachMenu attachedIds={attached.map((d) => d.id)} onUpload={uploadFiles} onPick={pick} disabled={chat.streaming} />
+          <IconButton
+            label={webAvailable ? (useWeb ? 'Web search on' : 'Web search off') : 'Web search is not configured on this workspace'}
+            aria-pressed={useWeb}
+            disabled={!webAvailable || chat.streaming}
+            onClick={() => setWebSearch((v) => !v)}
+            className={useWeb ? '!bg-accent-soft !text-accent' : ''}
+          >
+            <Globe className="size-4.5" />
+          </IconButton>
           {models && <ModelPicker models={models.models} value={modelId} onChange={setModelId} disabled={chat.streaming} />}
         </>
       }
@@ -262,11 +274,11 @@ export function ChatView({
                 busy={chat.streaming}
                 onEdit={async (id, content) => {
                   stickToBottom.current = true
-                  report(await chat.edit(id, content, modelId))
+                  report(await chat.edit(id, content, modelId, useWeb))
                 }}
                 onRegenerate={async () => {
                   stickToBottom.current = true
-                  report(await chat.regenerate(modelId))
+                  report(await chat.regenerate(modelId, useWeb))
                 }}
               />
             ))}

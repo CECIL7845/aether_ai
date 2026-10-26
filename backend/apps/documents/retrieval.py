@@ -21,19 +21,25 @@ class Source:
     """A numbered excerpt given to the model; the model cites it as [S<n>]."""
 
     ref: str
-    chunk_id: int
-    document_id: int
+    chunk_id: int | None
+    document_id: int | None
     title: str
     location: str
     text: str
+    url: str = ""
+    kind: str = "document"  # "document" or "web"
+    retrieved: bool = True  # False when only a search snippet was available (page not read)
 
     def public(self, snippet_chars: int = 280) -> dict:
         snippet = " ".join(self.text.split())
         return {
             "ref": self.ref,
+            "kind": self.kind,
             "document_id": self.document_id,
+            "url": self.url,
             "title": self.title,
             "location": self.location,
+            "retrieved": self.retrieved,
             "snippet": snippet[:snippet_chars] + ("…" if len(snippet) > snippet_chars else ""),
         }
 

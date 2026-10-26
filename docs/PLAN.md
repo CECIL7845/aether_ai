@@ -1,6 +1,6 @@
 # Aether — Implementation Plan and Architecture
 
-Status: Phases 1–5 are complete. Last updated 2026-10-26.
+Status: Phases 1–6 are complete in code. Phase 6 still needs live verification with a search key. Last updated 2026-10-26.
 "Aether" is a provisional name. Its availability has **not** been checked yet; that check happens in Phase 12. The name is configurable through `PRODUCT_NAME`.
 
 ## 1. Commercial reality (read first)
@@ -63,7 +63,7 @@ Key decisions:
 | Embeddings | Gemini `gemini-embedding-001` at 768 dimensions (pluggable; `EMBEDDING_PROVIDER=none` gives keyword-only search) | Anthropic has no embeddings endpoint. Hybrid search (pgvector cosine + Postgres full-text, reciprocal-rank fusion) still works without embeddings. |
 | Code execution | **Not in MVP** | Running arbitrary code safely needs a hardened sandbox. Coding help is explain, review and generate only. |
 | Data analysis | Allow-listed operations (describe, filter, group-by, aggregate, chart spec) on pandas/DuckDB | No user or model code is executed, and every result is deterministic. |
-| Web search | Search API (Brave/Tavily, verify terms and pricing in Phase 6); Claude's server-side `web_search` when using Claude | Citations are restricted to URLs actually fetched. |
+| Web search | Tavily search API (free tier reported at 1,000 credits/month, no card) + Aether's own SSRF-hardened fetcher | Provider-independent, so any chat model can use it. Gemini's Google Search grounding is not available on the free tier (returned 429). Brave dropped its free plan in Feb 2026 (requires a card). |
 
 ## 5. MVP scope (what is built before anything else)
 
@@ -80,7 +80,7 @@ Later: image generation, organisations and multi-tenant hosting, user memory, PD
 | 3 | Conversation engine + providers | A real streamed reply is persisted; provider errors and 429s are handled; usage is recorded ✅ (verified live with Gemini; the Anthropic adapter is written but untested until a key is added) |
 | 4 | UI and conversation management | Every conversation feature works end-to-end in a browser test, on desktop and mobile ✅ (Playwright, real Gemini) |
 | 5 | Documents | Upload → extract → chunk → embed → cited answer; malformed, oversized and encrypted files are rejected with a clear message ✅ |
-| 6 | Web research | Answers cite only fetched URLs; SSRF protections are tested |
+| 6 | Web research | Answers cite only fetched URLs; SSRF protections are tested ✅ in code and tests; live run needs `TAVILY_API_KEY` |
 | 7 | Coding + data analysis | Dataset Q&A returns numbers computed by tools, checked against known fixtures |
 | 8 | Images + tools | Tool permissions are enforced server-side; consequential actions need confirmation |
 | 9 | Security and ops controls | Spend caps, rate limits, audit log, retention/deletion; OWASP checklist recorded |
@@ -117,3 +117,11 @@ Example assumption to test in Phase 9: 1 user × 30 messages/day × (3K input + 
 - **Grounding:** if all attached documents total ≤ `FULL_CONTEXT_MAX_CHARS`, they are sent in full; otherwise the top-k hybrid search results are sent. Excerpts are numbered `[S1]…` inside `<documents>` tags. Document text cannot close those tags. The system prompt tells the model to treat document content as untrusted data.
 - **Citation checks:** after a reply, citations are checked against the sources actually supplied. Valid ones are stored and shown with their snippets. Invalid ones (for example `[S9]` when only S1–S2 were given) are flagged in the UI as possible fabrications.
 - **Known limits:** no OCR; no image understanding inside documents; source snippets show the chunk, not a highlighted span; prompt-injection resistance relies on delimiting plus instructions and is not a guarantee.
+
+## 10. Web research (as built)
+
+- **Flow:** search (Tavily, 5 results) → fetch each result page with Aether's own fetcher → pick the most relevant passages → number them `[W1]…` inside `<web_results>`. The model must cite them, and citations are validated the same way as for documents.
+- **Fetcher safety:** http(s) only, ports 80/443, no URLs with embedded credentials. Every redirect hop is re-validated, and any host that resolves to a private, loopback, link-local (cloud metadata), CGNAT, multicast or reserved address is refused. robots.txt is honoured. Responses are limited by size, time and content type. Scripts, navigation and footers are dropped from extracted text.
+- **Honesty:** if a page could not be read, its search snippet is used and labelled `retrieved="false"` for the model and "snippet only" in the UI. Search failures are shown to the user, and the model is told there were no usable results.
+- **Cost control:** web searches per user per day are capped (`WEB_SEARCHES_PER_DAY`) and recorded in the usage ledger.
+- **Known limits:** pages rendered by JavaScript or behind a login can't be read. DNS rebinding remains a residual risk (use an egress proxy in high-security deployments). The search query is the user's message, not a model-rewritten query.
