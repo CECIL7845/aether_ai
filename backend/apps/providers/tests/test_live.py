@@ -94,3 +94,42 @@ def test_tavily_search_and_safe_fetch_of_a_real_page():
     finally:
         fetcher.close()
     assert "Django" in page.text and page.url.startswith("https://docs.djangoproject.com/")
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_gemini_uses_analysis_tools_for_numbers():
+    from asgiref.sync import sync_to_async
+    from django.db import connections
+
+    from apps.accounts.models import User
+    from apps.analysis.executor import AnalysisExecutor
+    from apps.analysis.tests.test_tools import make_dataset
+    from apps.analysis.tools import INSTRUCTIONS, SPECS, ToolContext
+    from apps.chat.models import Conversation
+    from apps.providers.base import ToolActivity
+
+    if not settings.GEMINI_API_KEY:
+        pytest.skip("gemini has no API key configured")
+    user = await sync_to_async(User.objects.create_user)("live@example.com", "correct-horse-battery-9")
+    conv = await Conversation.objects.acreate(user=user)
+    doc = await sync_to_async(make_dataset)(user)
+    executor = AnalysisExecutor(ToolContext(user=user, conversation=conv, datasets=[doc]))
+    text, tools_used = [], []
+    try:
+        async for event in get_provider("gemini").stream(
+            model_id="gemini-3.5-flash-lite",
+            messages=[ChatMessage("user", "What is the total revenue for the Accra region? Use the tools.")],
+            system="You are a data analyst." + INSTRUCTIONS,
+            max_output_tokens=2048,
+            tools=SPECS,
+            execute=executor,
+        ):
+            if isinstance(event, TextDelta):
+                text.append(event.text)
+            elif isinstance(event, ToolActivity) and event.status != "running":
+                tools_used.append((event.name, event.status))
+    finally:
+        await sync_to_async(connections.close_all)()
+    answer = "".join(text).replace(",", "")
+    assert ("query_dataset", "done") in tools_used, tools_used
+    assert "1910.5" in answer, answer

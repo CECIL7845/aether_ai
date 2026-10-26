@@ -6,6 +6,7 @@ import re
 
 from asgiref.sync import sync_to_async
 
+from apps.analysis.datasets import DATASET_KINDS
 from apps.documents.models import Document
 from apps.documents.retrieval import Source, full_context, search
 from apps.providers.base import ChatMessage
@@ -85,7 +86,10 @@ async def ground(
     """Returns (history with the last user turn wrapped in sources, all sources, info for the client)."""
     if not history or history[-1].role != "user":
         return history, [], {}
-    docs = [d async for d in conversation.documents.filter(user=user).order_by("pk")]
+    # Spreadsheets are analysed with deterministic tools instead of being pasted into the prompt as text.
+    docs = [
+        d async for d in conversation.documents.filter(user=user).exclude(kind__in=DATASET_KINDS).order_by("pk")
+    ]
     if not docs and not web:
         return history, [], {}
     question = history[-1].content

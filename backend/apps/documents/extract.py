@@ -94,11 +94,20 @@ def check_signature(kind: str, head: bytes) -> None:
             raise ExtractionError("This file's content does not match its text extension.")
 
 
-def extract(kind: str, data: bytes) -> Extracted:
+CODE_EXTENSIONS = {"py", "js", "ts", "tsx", "jsx", "java", "go", "rb", "php", "cs", "c", "h", "cpp", "rs", "kt",
+                   "swift", "sql", "html", "css", "sh", "dart", "yaml", "yml", "toml", "xml", "json"}
+CODE_LINES_PER_SEGMENT = 60
+
+
+def extract(kind: str, data: bytes, filename: str = "") -> Extracted:
     if not data:
         raise ExtractionError("The file is empty.")
     check_signature(kind, data[:8])
-    result = {"pdf": _pdf, "docx": _docx, "xlsx": _xlsx, "csv": _csv, "text": _text}[kind](data)
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if kind == "text" and ext in CODE_EXTENSIONS:
+        result = _code(data)
+    else:
+        result = {"pdf": _pdf, "docx": _docx, "xlsx": _xlsx, "csv": _csv, "text": _text}[kind](data)
     if result.char_count > settings.MAX_EXTRACTED_CHARS:
         raise ExtractionError(
             f"The document contains more than {settings.MAX_EXTRACTED_CHARS:,} characters of text, which exceeds "
@@ -125,6 +134,19 @@ def _decode(data: bytes) -> str:
 
 def _text(data: bytes) -> Extracted:
     return Extracted([Segment(_decode(data).replace("\r\n", "\n"))])
+
+
+def _code(data: bytes) -> Extracted:
+    """Source code in line-numbered sections, so answers can cite exact line ranges."""
+    lines = _decode(data).replace("\r\n", "\n").split("\n")
+    segments = []
+    for start in range(0, len(lines), CODE_LINES_PER_SEGMENT):
+        block = lines[start : start + CODE_LINES_PER_SEGMENT]
+        if any(line.strip() for line in block):
+            first, last = start + 1, start + len(block)
+            numbered = "\n".join(f"{first + i:>5} | {line}" for i, line in enumerate(block))
+            segments.append(Segment(numbered, location=f"Lines {first}–{last}"))
+    return Extracted(segments)
 
 
 def _pdf(data: bytes) -> Extracted:

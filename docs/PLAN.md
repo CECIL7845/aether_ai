@@ -1,6 +1,6 @@
 # Aether — Implementation Plan and Architecture
 
-Status: Phases 1–6 are complete in code. Phase 6 still needs live verification with a search key. Last updated 2026-10-26.
+Status: Phases 1–7 are complete. Last updated 2026-10-26. Last updated 2026-10-26.
 "Aether" is a provisional name. Its availability has **not** been checked yet; that check happens in Phase 12. The name is configurable through `PRODUCT_NAME`.
 
 ## 1. Commercial reality (read first)
@@ -80,8 +80,8 @@ Later: image generation, organisations and multi-tenant hosting, user memory, PD
 | 3 | Conversation engine + providers | A real streamed reply is persisted; provider errors and 429s are handled; usage is recorded ✅ (verified live with Gemini; the Anthropic adapter is written but untested until a key is added) |
 | 4 | UI and conversation management | Every conversation feature works end-to-end in a browser test, on desktop and mobile ✅ (Playwright, real Gemini) |
 | 5 | Documents | Upload → extract → chunk → embed → cited answer; malformed, oversized and encrypted files are rejected with a clear message ✅ |
-| 6 | Web research | Answers cite only fetched URLs; SSRF protections are tested ✅ in code and tests; live run needs `TAVILY_API_KEY` |
-| 7 | Coding + data analysis | Dataset Q&A returns numbers computed by tools, checked against known fixtures |
+| 6 | Web research | Answers cite only fetched URLs; SSRF protections are tested ✅ (verified live with Tavily) |
+| 7 | Coding + data analysis | Dataset Q&A returns numbers computed by tools, checked against known fixtures ✅ (verified live: Gemini function calling → pandas) |
 | 8 | Images + tools | Tool permissions are enforced server-side; consequential actions need confirmation |
 | 9 | Security and ops controls | Spend caps, rate limits, audit log, retention/deletion; OWASP checklist recorded |
 | 10 | Testing | Unit, API, E2E and eval suites; report of passed, failed and not run |
@@ -125,3 +125,13 @@ Example assumption to test in Phase 9: 1 user × 30 messages/day × (3K input + 
 - **Honesty:** if a page could not be read, its search snippet is used and labelled `retrieved="false"` for the model and "snippet only" in the UI. Search failures are shown to the user, and the model is told there were no usable results.
 - **Cost control:** web searches per user per day are capped (`WEB_SEARCHES_PER_DAY`) and recorded in the usage ledger.
 - **Known limits:** pages rendered by JavaScript or behind a login can't be read. DNS rebinding remains a residual risk (use an egress proxy in high-security deployments). The search query is the user's message, not a model-rewritten query.
+
+## 11. Tool framework and data analysis (as built)
+
+- **Provider-neutral tools:** `ToolSpec` (JSON Schema) and a `ToolExecutor` callback. Each adapter runs its own loop, because the provider's own message parts must be replayed verbatim (Gemini thought signatures, Claude thinking blocks). The loop is capped at `MAX_TOOL_ROUNDS = 6`, and the final round offers no tools. Usage is summed across rounds.
+- **Analysis tools** (enabled only when a CSV/XLSX is attached): `list_datasets`, `describe_dataset`, `query_dataset` (filter/group/aggregate/sort/select), `create_chart` (bar/line/scatter; no pie charts), and `calculate` (AST-whitelisted arithmetic). Every argument is validated, and no model-written code is executed. Errors go back to the model as tool errors so it can correct itself.
+- **Results:** stored as `AnalysisResult` rows so they can be reproduced, charted and downloaded as CSV. Cells are protected against formula injection.
+- **Grounding:** spreadsheets are no longer pasted into the prompt as text; numbers must come from the tools.
+- **UI:** a list of analysis steps, result tables with CSV download, and SVG charts. Charts use the validated categorical palette (colour-blind checked in light and dark), and each has a hover tooltip, a legend for two or more series, and a table view.
+- **Coding:** code files are extracted in line-numbered sections ("Lines 61–120") so answers can cite exact lines. The system prompt includes code-review guidance. Code is never executed (no sandbox in this release).
+- **Latency (measured 2026-10-26):** server preparation ~4 ms. The Gemini free tier takes 14–20 s to the first token, and about 25 s per tool round. The UI shows each stage with an elapsed-time counter, and every reply stores `first_token_ms` and `duration_ms`.

@@ -46,6 +46,9 @@ class Message(models.Model):
     citations = models.JSONField(default=list, blank=True)
     # Citation markers in the reply that did not match any provided source (a sign of fabrication).
     invalid_citations = models.JSONField(default=list, blank=True)
+    # Tool calls made while producing this reply, and what they produced for the UI (tables, charts).
+    tool_calls = models.JSONField(default=list, blank=True)
+    artifacts = models.JSONField(default=list, blank=True)
     # Latency observability: time from request to first streamed text, and to completion.
     first_token_ms = models.PositiveIntegerField(null=True, blank=True)
     duration_ms = models.PositiveIntegerField(null=True, blank=True)

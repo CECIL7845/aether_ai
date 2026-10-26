@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "apps.usage",
     "apps.documents",
     "apps.research",
+    "apps.analysis",
 ]
 
 MIDDLEWARE = [
@@ -186,3 +187,7 @@ WEB_FETCH_MAX_CHARS = env.int("WEB_FETCH_MAX_CHARS", default=200_000)
 WEB_MAX_CHARS_PER_PAGE = env.int("WEB_MAX_CHARS_PER_PAGE", default=5_000)
 # Never disable in production: blocks fetches to private/internal networks (SSRF protection).
 WEB_FETCH_BLOCK_PRIVATE_NETWORKS = env.bool("WEB_FETCH_BLOCK_PRIVATE_NETWORKS", default=True)
+
+# --- Data analysis ---
+ANALYSIS_RESULT_MAX_ROWS = env.int("ANALYSIS_RESULT_MAX_ROWS", default=10_000)
+ANALYSIS_CHART_MAX_POINTS = env.int("ANALYSIS_CHART_MAX_POINTS", default=200)

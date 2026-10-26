@@ -17,6 +17,8 @@ export type Message = {
   citations: SourceRef[]
   invalid_citations: string[]
   created_at: string
+  tool_calls?: ToolCall[]
+  artifacts?: Artifact[]
   first_token_ms?: number | null
   duration_ms?: number | null
   /** Client-only: what the server reported about document grounding while streaming this reply. */
@@ -102,3 +104,33 @@ export type UsageResponse = {
   cost_this_month_usd: string
   monthly_cost_limit_usd: string
 }
+
+export type ToolCall = {
+  id: string
+  name: string
+  args: Record<string, unknown>
+  status: 'running' | 'done' | 'error'
+  summary: string
+}
+
+export type TableArtifact = {
+  type: 'table'
+  result_id: number
+  title: string
+  columns: string[]
+  rows: (string | number | boolean | null)[][]
+  total_rows: number
+}
+
+export type ChartArtifact = {
+  type: 'chart'
+  chart_type: 'bar' | 'line' | 'scatter'
+  title: string
+  x: string
+  y: string[]
+  points: number
+  truncated: boolean
+  data: Record<string, string | number | null>[]
+}
+
+export type Artifact = TableArtifact | ChartArtifact

@@ -25,7 +25,7 @@ def process_document(document_id: int) -> None:
     try:
         with document.file.open("rb") as f:
             data = f.read()
-        extracted = extract(document.kind, data)
+        extracted = extract(document.kind, data, document.title)
         drafts = chunk_segments(extracted.segments)
 
         vectors: list[list[float]] | None = None

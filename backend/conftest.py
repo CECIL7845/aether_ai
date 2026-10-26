@@ -5,7 +5,7 @@ import pytest
 from django.core.cache import cache
 from rest_framework.test import APIClient
 
-from apps.providers.base import ProviderError, StreamDone, TextDelta, Usage
+from apps.providers.base import ProviderError, StreamDone, TextDelta, ToolActivity, Usage
 from apps.providers.registry import _BY_ID, MODELS, ModelSpec
 from apps.providers.services import _PROVIDERS, register_provider
 
@@ -50,12 +50,22 @@ class ScriptedProvider:
         self.error_after = 0
         self.delay = 0.0
         self.calls: list[dict] = []
+        # Tool calls to make (in order) before answering, when tools are offered: [(name, args), ...]
+        self.tool_script: list[tuple[str, dict]] = []
+        self.tool_results: list[dict] = []
 
     def is_configured(self):
         return True
 
-    async def stream(self, *, model_id, messages, system, max_output_tokens):
-        self.calls.append({"model_id": model_id, "messages": messages, "system": system})
+    async def stream(self, *, model_id, messages, system, max_output_tokens, tools=None, execute=None):
+        self.calls.append({"model_id": model_id, "messages": messages, "system": system, "tools": tools})
+        if tools and execute:
+            for i, (name, args) in enumerate(self.tool_script):
+                call_id = f"call_{i}"
+                yield ToolActivity(call_id, name, "running", args)
+                result, activity = await execute(call_id, name, args)
+                self.tool_results.append(result)
+                yield activity
         for i, chunk in enumerate(self.chunks):
             if self.error and i == self.error_after:
                 raise self.error

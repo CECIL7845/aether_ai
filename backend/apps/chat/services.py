@@ -9,10 +9,15 @@ import time
 from collections.abc import AsyncIterator
 from datetime import date
 
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.cache import cache
 
-from apps.providers.base import ChatMessage, ProviderError, StreamDone, TextDelta
+from apps.analysis.executor import AnalysisExecutor
+from apps.analysis.tools import INSTRUCTIONS as ANALYSIS_INSTRUCTIONS
+from apps.analysis.tools import SPECS as ANALYSIS_TOOLS
+from apps.analysis.tools import ToolContext, datasets_for
+from apps.providers.base import ChatMessage, ProviderError, StreamDone, TextDelta, ToolActivity
 from apps.providers.registry import ModelSpec
 from apps.providers.services import get_provider
 from apps.usage.models import UsageRecord
@@ -41,7 +46,10 @@ def system_prompt() -> str:
         "Be accurate and direct. If you are unsure or lack information, say so instead of guessing.\n"
         "You cannot browse the web, open files, or take actions yourself. Source material is provided to you only "
         "when the user enables web search or attaches documents; never claim to have looked something up otherwise.\n"
-        "Format answers in Markdown. Put code in fenced code blocks with a language tag."
+        "Format answers in Markdown. Put code in fenced code blocks with a language tag.\n"
+        "For code: explain your reasoning briefly, point to specific lines when reviewing or debugging, prefer "
+        "minimal correct changes, and mention edge cases and security issues you notice. You cannot run code, so "
+        "never claim you executed or tested it."
     )
 
 
@@ -126,15 +134,26 @@ async def generate_reply(
         if not history:
             raise ProviderError("bad_request", "There is no user message to reply to.", spec.provider)
         system = system_prompt() + instructions(grounding)
+        datasets = await sync_to_async(datasets_for)(conversation, user)
+        executor = None
+        if datasets:
+            executor = AnalysisExecutor(ToolContext(user=user, conversation=conversation, datasets=datasets))
+            system += ANALYSIS_INSTRUCTIONS
 
         yield sse("status", {"stage": "generating", "provider": spec.provider})
         prep_ms = ms()
         provider = get_provider(spec.provider)
         max_out = min(settings.MAX_OUTPUT_TOKENS, spec.max_output_tokens)
         async for event in provider.stream(
-            model_id=spec.id, messages=history, system=system, max_output_tokens=max_out
+            model_id=spec.id, messages=history, system=system, max_output_tokens=max_out,
+            tools=ANALYSIS_TOOLS if executor else None, execute=executor,
         ):
-            if isinstance(event, TextDelta):
+            if isinstance(event, ToolActivity):
+                yield sse("tool", {"call_id": event.call_id, "name": event.name, "status": event.status,
+                                   "args": event.args, "summary": event.summary, "artifact": event.artifact})
+                if executor:
+                    assistant.tool_calls, assistant.artifacts = executor.calls, executor.artifacts
+            elif isinstance(event, TextDelta):
                 if assistant.first_token_ms is None:
                     assistant.first_token_ms = ms()
                 parts.append(event.text)
@@ -224,6 +243,8 @@ def _message_summary(m: Message) -> dict:
         "error_message": m.error_message,
         "citations": m.citations,
         "invalid_citations": m.invalid_citations,
+        "tool_calls": m.tool_calls,
+        "artifacts": m.artifacts,
         "first_token_ms": m.first_token_ms,
         "duration_ms": m.duration_ms,
     }

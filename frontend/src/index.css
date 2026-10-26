@@ -24,6 +24,11 @@
   --success: #17803d;
   --code-bg: #f4f4f8;
   --shadow: 0 1px 2px rgb(16 16 29 / 0.06), 0 4px 16px rgb(16 16 29 / 0.06);
+  /* Chart series, fixed order. Validated (CVD/contrast) against #ffffff; slots 3–4 need the table view as relief. */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
 }
 
 :root[data-theme='dark'] {
@@ -47,6 +52,10 @@
   --success: #4ccf7c;
   --code-bg: #12121a;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 16px rgb(0 0 0 / 0.3);
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -71,6 +80,10 @@
     --success: #4ccf7c;
     --code-bg: #12121a;
     --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 16px rgb(0 0 0 / 0.3);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
   }
 }
 

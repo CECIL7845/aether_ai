@@ -13,4 +13,5 @@ urlpatterns = [
     path("api/usage/me/", MyUsageView.as_view()),
     path("api/", include("apps.chat.urls")),
     path("api/", include("apps.documents.urls")),
+    path("api/", include("apps.analysis.urls")),
 ]

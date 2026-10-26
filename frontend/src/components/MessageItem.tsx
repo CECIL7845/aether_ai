@@ -4,6 +4,7 @@ import clsx from 'clsx'
 import type { Message, ModelInfo } from '../api/types'
 import { formatCost, formatTokens } from '../lib/format'
 import { CopyButton, Markdown } from './Markdown'
+import { ArtifactList, ToolActivityList } from './Artifacts'
 import { Sources } from './Sources'
 import { Button, IconButton } from './ui'
 
@@ -125,6 +126,7 @@ export function MessageItem({
   const cost = formatCost(message.cost_usd)
   return (
     <div className="group">
+      <ToolActivityList calls={message.tool_calls ?? []} />
       {message.content ? (
         <Markdown content={message.content} />
       ) : message.status === 'streaming' ? (
@@ -150,6 +152,7 @@ export function MessageItem({
         </div>
       )}
 
+      <ArtifactList artifacts={message.artifacts ?? []} />
       {message.status !== 'streaming' && <Sources message={message} />}
 
       {message.status === 'stopped' && (

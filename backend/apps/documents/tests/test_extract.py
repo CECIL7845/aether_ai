@@ -87,3 +87,12 @@ def test_chunking_packs_small_and_splits_large_segments_keeping_pages():
     assert chunks[0].text == "short one\n\nshort two" and chunks[0].location == "Pages 1–2"
     big = [c for c in chunks if c.page_start == 3]
     assert len(big) > 1 and all(len(c.text) <= CHUNK_CHARS for c in big)
+
+
+def test_code_files_are_split_into_line_numbered_sections():
+    source = "\n".join(f"line_{i} = {i}" for i in range(1, 131)).encode()
+    result = extract("text", source, "settings.py")
+    assert [s.location for s in result.segments] == ["Lines 1–60", "Lines 61–120", "Lines 121–130"]
+    assert result.segments[1].text.splitlines()[0] == "   61 | line_61 = 61"
+    # Plain text files are not line-numbered.
+    assert extract("text", b"hello", "notes.txt").segments[0].location == ""

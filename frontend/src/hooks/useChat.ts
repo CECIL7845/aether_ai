@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, postStream, type SSEEvent } from '../api/client'
 import { conversations } from '../api/endpoints'
-import type { ConversationDetail, GroundingInfo, Message, SourceRef } from '../api/types'
+import type { Artifact, ConversationDetail, GroundingInfo, Message, SourceRef, ToolCall } from '../api/types'
 
 let tempId = -1
 const nextTempId = () => tempId--
@@ -98,6 +98,17 @@ export function useChat(conversationId: number | null, { onTitle, onChanged }: O
           const realId = data.assistant_message_id as number
           patch(assistantId, { id: realId, model_id: data.model_id as string })
           assistantId = realId
+        } else if (event === 'tool') {
+          const call = { id: data.call_id as string, name: data.name as string, args: data.args as Record<string, unknown>,
+            status: data.status as ToolCall['status'], summary: data.summary as string }
+          patch(assistantId, (m) => {
+            const calls = [...(m.tool_calls ?? [])]
+            const i = calls.findIndex((c) => c.id === call.id)
+            if (i === -1) calls.push(call)
+            else calls[i] = call
+            const artifact = data.artifact as Artifact | null
+            return { tool_calls: calls, artifacts: artifact ? [...(m.artifacts ?? []), artifact] : m.artifacts }
+          })
         } else if (event === 'status') {
           patch(assistantId, { stage: { ...(data as { stage: 'generating' }), since: Date.now() } })
         } else if (event === 'sources') {

@@ -268,8 +268,9 @@ async def test_stop_keeps_partial_answer_and_charges_an_estimate(scripted):
             received.append(chunk)
 
     task = asyncio.create_task(consume())
-    while not any("Once upon" in c for c in received):
-        await asyncio.sleep(0.01)
+    async with asyncio.timeout(10):
+        while not any("Once upon" in c for c in received):
+            await asyncio.sleep(0.01)
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
