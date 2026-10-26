@@ -1,0 +1,51 @@
+[project]
+name = "aether-backend"
+version = "0.1.0"
+description = "Add your description here"
+authors = [
+    { name = "Cecil Odonkor", email = "odonkorcecil123@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "anthropic>=2.3.0",
+    "argon2-cffi>=25.1.0",
+    "django>=6,<7",
+    "django-environ>=0.14.0",
+    "django-ratelimit>=4.1.0",
+    "djangorestframework>=3.18.3",
+    "google-genai>=2.33.0",
+    "pgvector>=0.5.1",
+    "psycopg[binary]>=3.3.6",
+    "uvicorn>=0.54.0",
+]
+
+[project.scripts]
+aether-backend = "aether_backend:main"
+
+[build-system]
+requires = ["uv_build>=0.13.5,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.1",
+    "pytest-django>=4.14.0",
+    "ruff>=0.17.2",
+]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["test_*.py"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S"]
+ignore = ["S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/*" = ["S105", "S106"]
+"**/migrations/*" = ["E501"]

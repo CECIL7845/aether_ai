@@ -1,0 +1,172 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+
+/* Design tokens. Components use these via Tailwind utilities (bg-surface, text-muted, ...). */
+:root {
+  color-scheme: light;
+  --bg: #f7f7f9;
+  --surface: #ffffff;
+  --surface-2: #f0f0f4;
+  --surface-3: #e6e6ed;
+  --border: #e2e2ea;
+  --text: #16161d;
+  --text-muted: #5b5b6b;
+  --text-faint: #8a8a99;
+  --accent: #4f46e5;
+  --accent-strong: #4338ca;
+  --accent-soft: #eef0ff;
+  --accent-contrast: #ffffff;
+  --danger: #c2261d;
+  --danger-soft: #fdecea;
+  --warning: #9a6200;
+  --warning-soft: #fff5e0;
+  --success: #17803d;
+  --code-bg: #f4f4f8;
+  --shadow: 0 1px 2px rgb(16 16 29 / 0.06), 0 4px 16px rgb(16 16 29 / 0.06);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0e0e13;
+  --surface: #16161d;
+  --surface-2: #1d1d26;
+  --surface-3: #262632;
+  --border: #2a2a36;
+  --text: #ececf1;
+  --text-muted: #a3a3b3;
+  --text-faint: #72727f;
+  --accent: #8b85ff;
+  --accent-strong: #a5a1ff;
+  --accent-soft: #23224a;
+  --accent-contrast: #0e0e13;
+  --danger: #ff6b61;
+  --danger-soft: #3a1b1a;
+  --warning: #f2b544;
+  --warning-soft: #33280f;
+  --success: #4ccf7c;
+  --code-bg: #12121a;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 16px rgb(0 0 0 / 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #0e0e13;
+    --surface: #16161d;
+    --surface-2: #1d1d26;
+    --surface-3: #262632;
+    --border: #2a2a36;
+    --text: #ececf1;
+    --text-muted: #a3a3b3;
+    --text-faint: #72727f;
+    --accent: #8b85ff;
+    --accent-strong: #a5a1ff;
+    --accent-soft: #23224a;
+    --accent-contrast: #0e0e13;
+    --danger: #ff6b61;
+    --danger-soft: #3a1b1a;
+    --warning: #f2b544;
+    --warning-soft: #33280f;
+    --success: #4ccf7c;
+    --code-bg: #12121a;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 16px rgb(0 0 0 / 0.3);
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--text-muted);
+  --color-faint: var(--text-faint);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-success: var(--success);
+  --color-code-bg: var(--code-bg);
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+  --shadow-card: var(--shadow);
+}
+
+/* Base styles live in the base layer so Tailwind utilities can override them. */
+@layer base {
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+}
+
+/* Rendered Markdown in assistant messages */
+.prose-chat {
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.prose-chat > * + * { margin-top: 0.85em; }
+.prose-chat h1, .prose-chat h2, .prose-chat h3 { font-weight: 650; line-height: 1.3; margin-top: 1.3em; }
+.prose-chat h1 { font-size: 1.35em; }
+.prose-chat h2 { font-size: 1.2em; }
+.prose-chat h3 { font-size: 1.05em; }
+.prose-chat ul { list-style: disc; padding-left: 1.4em; }
+.prose-chat ol { list-style: decimal; padding-left: 1.4em; }
+.prose-chat li + li { margin-top: 0.3em; }
+.prose-chat a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.prose-chat blockquote { border-left: 3px solid var(--border); padding-left: 1em; color: var(--text-muted); }
+.prose-chat :not(pre) > code {
+  font-family: var(--font-mono); font-size: 0.88em; background: var(--surface-2);
+  padding: 0.12em 0.35em; border-radius: 5px;
+}
+.prose-chat table { border-collapse: collapse; display: block; overflow-x: auto; font-size: 0.92em; }
+.prose-chat th, .prose-chat td { border: 1px solid var(--border); padding: 0.4em 0.7em; text-align: left; }
+.prose-chat th { background: var(--surface-2); font-weight: 600; }
+.prose-chat hr { border-color: var(--border); }
+
+/* highlight.js token colours, themed with the app tokens */
+.hljs { color: var(--text); }
+.hljs-comment, .hljs-quote { color: var(--text-faint); font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-type { color: #7c3aed; }
+.hljs-string, .hljs-attr, .hljs-template-tag, .hljs-regexp { color: #0f7b52; }
+.hljs-number, .hljs-literal, .hljs-symbol, .hljs-bullet { color: #b45309; }
+.hljs-title, .hljs-section, .hljs-function .hljs-title { color: #2563eb; }
+.hljs-meta, .hljs-variable, .hljs-params { color: var(--text-muted); }
+:root[data-theme='dark'] .hljs-keyword, :root[data-theme='dark'] .hljs-built_in, :root[data-theme='dark'] .hljs-type { color: #c4a7ff; }
+:root[data-theme='dark'] .hljs-string, :root[data-theme='dark'] .hljs-attr { color: #7ee2a8; }
+:root[data-theme='dark'] .hljs-number, :root[data-theme='dark'] .hljs-literal { color: #f5b971; }
+:root[data-theme='dark'] .hljs-title, :root[data-theme='dark'] .hljs-section { color: #8ab4ff; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .hljs-keyword, :root:not([data-theme='light']) .hljs-built_in { color: #c4a7ff; }
+  :root:not([data-theme='light']) .hljs-string, :root:not([data-theme='light']) .hljs-attr { color: #7ee2a8; }
+  :root:not([data-theme='light']) .hljs-number, :root:not([data-theme='light']) .hljs-literal { color: #f5b971; }
+  :root:not([data-theme='light']) .hljs-title, :root:not([data-theme='light']) .hljs-section { color: #8ab4ff; }
+}
