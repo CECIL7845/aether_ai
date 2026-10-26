@@ -22,6 +22,8 @@ class ModelSpec:
     supports_vision: bool = False
     supports_tools: bool = False
     supports_fallbacks: bool = False
+    # Gemini only: thinking depth ("low", "medium", "high"). Lower = faster first token. None = model default.
+    thinking_level: str | None = None
     input_price_per_mtok: Decimal | None = None
     output_price_per_mtok: Decimal | None = None
     price_source: str = ""
@@ -48,6 +50,8 @@ MODELS: list[ModelSpec] = [
     ModelSpec(
         id="gemini-3.5-flash",
         provider="gemini",
+        # Default thinking spent ~600 tokens (~5 s) before the first word in measurements on 2026-10-26.
+        thinking_level="low",
         label="Gemini 3.5 Flash",
         # Limits from the Gemini Models API (input_token_limit / output_token_limit), checked 2026-10-26.
         context_window=1_048_576,
@@ -68,6 +72,8 @@ MODELS: list[ModelSpec] = [
     ModelSpec(
         id="gemini-flash-latest",
         provider="gemini",
+        # Default thinking spent ~600 tokens (~5 s) before the first word in measurements on 2026-10-26.
+        thinking_level="low",
         label="Gemini Flash (latest alias)",
         # Limits from the Gemini Models API (input_token_limit / output_token_limit), checked 2026-10-26.
         context_window=1_048_576,

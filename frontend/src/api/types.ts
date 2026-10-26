@@ -17,8 +17,12 @@ export type Message = {
   citations: SourceRef[]
   invalid_citations: string[]
   created_at: string
+  first_token_ms?: number | null
+  duration_ms?: number | null
   /** Client-only: what the server reported about document grounding while streaming this reply. */
   grounding?: GroundingInfo
+  /** Client-only: current server stage while waiting for the first words. */
+  stage?: { stage: 'searching_web' | 'reading_documents' | 'generating'; provider?: string; since: number }
 }
 
 export type SourceRef = {

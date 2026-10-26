@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from collections.abc import AsyncIterator
 from datetime import date
 
@@ -91,6 +92,11 @@ async def generate_reply(
     user, conversation: Conversation, spec: ModelSpec, *, web: bool = False
 ) -> AsyncIterator[str]:
     """Stream SSE events for one assistant reply. Always ends with a `done` or `error` event."""
+    started = time.monotonic()
+
+    def ms() -> int:
+        return int((time.monotonic() - started) * 1000)
+
     quota = await check_quota(user)
     if not quota.allowed:
         yield sse("error", {"kind": "quota", "message": quota.reason})
@@ -102,30 +108,45 @@ async def generate_reply(
         return
 
     history = await build_history(conversation, settings.MAX_CONTEXT_TOKENS)
-    history, sources, grounding = await ground(user, conversation, history, web=web)
-    system = system_prompt() + instructions(grounding)
     assistant = await Message.objects.acreate(
         conversation=conversation, role=Message.Role.ASSISTANT, status=Message.Status.STREAMING, model_id=spec.id
     )
     parts: list[str] = []
+    sources: list = []
     try:
+        # Tell the client immediately, then report each slow stage so the wait is never silent.
         yield sse("start", {"assistant_message_id": assistant.pk, "model_id": spec.id})
+        if web:
+            yield sse("status", {"stage": "searching_web"})
+        elif await conversation.documents.aexists():
+            yield sse("status", {"stage": "reading_documents"})
+        history, sources, grounding = await ground(user, conversation, history, web=web)
         if grounding:
             yield sse("sources", grounding)
         if not history:
             raise ProviderError("bad_request", "There is no user message to reply to.", spec.provider)
+        system = system_prompt() + instructions(grounding)
 
+        yield sse("status", {"stage": "generating", "provider": spec.provider})
+        prep_ms = ms()
         provider = get_provider(spec.provider)
         max_out = min(settings.MAX_OUTPUT_TOKENS, spec.max_output_tokens)
         async for event in provider.stream(
             model_id=spec.id, messages=history, system=system, max_output_tokens=max_out
         ):
             if isinstance(event, TextDelta):
+                if assistant.first_token_ms is None:
+                    assistant.first_token_ms = ms()
                 parts.append(event.text)
                 yield sse("delta", {"text": event.text})
             elif isinstance(event, StreamDone):
+                assistant.duration_ms = ms()
                 assistant.citations, assistant.invalid_citations = check_citations("".join(parts), sources)
                 await _finish(user, conversation, assistant, spec, "".join(parts), event)
+                logger.info(
+                    "reply timing model=%s prep_ms=%s first_token_ms=%s total_ms=%s web=%s",
+                    assistant.model_id, prep_ms, assistant.first_token_ms, assistant.duration_ms, web,
+                )
                 yield sse("done", _message_summary(assistant))
     except ProviderError as e:
         logger.warning("provider error: %s (status=%s)", e, e.status_code)
@@ -203,6 +224,8 @@ def _message_summary(m: Message) -> dict:
         "error_message": m.error_message,
         "citations": m.citations,
         "invalid_citations": m.invalid_citations,
+        "first_token_ms": m.first_token_ms,
+        "duration_ms": m.duration_ms,
     }
 
 

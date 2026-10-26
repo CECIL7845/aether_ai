@@ -36,8 +36,16 @@ test('auth pages and validation', async ({ page }) => {
 test('full conversation lifecycle with a real model', async ({ page }) => {
   await register(page)
   await shot(page, '02-empty-state')
-  // Without a search API key the web toggle is visibly unavailable rather than silently doing nothing.
-  await expect(page.getByRole('button', { name: 'Web search is not configured on this workspace' })).toBeDisabled()
+  // The web toggle reflects configuration: disabled with an explanation when no search key is set.
+  const unconfigured = page.getByRole('button', { name: 'Web search is not configured on this workspace' })
+  if (await unconfigured.count()) {
+    await expect(unconfigured).toBeDisabled()
+  } else {
+    const toggle = page.getByRole('button', { name: 'Web search off' })
+    await toggle.click()
+    await expect(page.getByRole('button', { name: 'Web search on' })).toHaveAttribute('aria-pressed', 'true')
+    await page.getByRole('button', { name: 'Web search on' }).click()
+  }
 
   const composer = page.getByLabel('Message', { exact: true })
   await composer.fill('Reply with a short Python function that adds two numbers, in a fenced code block.')

@@ -6,8 +6,9 @@ import { defineConfig, devices } from '@playwright/test'
  */
 export default defineConfig({
   testDir: './e2e',
-  timeout: 90_000,
-  expect: { timeout: 45_000 },
+  // Free-tier AI providers can take 20–60 s to start answering when busy (measured 2026-10-26).
+  timeout: 240_000,
+  expect: { timeout: 90_000 },
   fullyParallel: false,
   workers: 1,
   reporter: [['list']],

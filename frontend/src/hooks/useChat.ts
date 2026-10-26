@@ -98,6 +98,8 @@ export function useChat(conversationId: number | null, { onTitle, onChanged }: O
           const realId = data.assistant_message_id as number
           patch(assistantId, { id: realId, model_id: data.model_id as string })
           assistantId = realId
+        } else if (event === 'status') {
+          patch(assistantId, { stage: { ...(data as { stage: 'generating' }), since: Date.now() } })
         } else if (event === 'sources') {
           patch(assistantId, { grounding: data as unknown as GroundingInfo })
         } else if (event === 'delta') {
@@ -114,6 +116,8 @@ export function useChat(conversationId: number | null, { onTitle, onChanged }: O
             error_message: (data.error_message as string) ?? '',
             citations: (data.citations as SourceRef[]) ?? [],
             invalid_citations: (data.invalid_citations as string[]) ?? [],
+            first_token_ms: data.first_token_ms as number | null,
+            duration_ms: data.duration_ms as number | null,
           })
         } else if (event === 'error') {
           patch(assistantId, {

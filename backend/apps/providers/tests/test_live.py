@@ -24,6 +24,7 @@ def _real_keys(settings):
     settings.GEMINI_API_KEY = settings.LIVE_API_KEYS["gemini"]
     settings.ANTHROPIC_API_KEY = settings.LIVE_API_KEYS["anthropic"]
     settings.EMBEDDING_PROVIDER = "gemini"
+    settings.TAVILY_API_KEY = settings.LIVE_API_KEYS["tavily"]
 
 
 def _first_model(provider: str) -> str:
@@ -77,3 +78,19 @@ def test_gemini_embeddings_rank_the_relevant_text_first():
     scores = [sum(a * b for a, b in zip(query, d, strict=True)) for d in docs]
     assert len(docs[0]) == settings.EMBEDDING_DIMENSIONS
     assert scores[0] > scores[1]
+
+
+def test_tavily_search_and_safe_fetch_of_a_real_page():
+    from apps.research.fetch import Fetcher
+    from apps.research.search import TavilySearch
+
+    if not settings.TAVILY_API_KEY:
+        pytest.skip("tavily has no API key configured")
+    results = TavilySearch().search("Django web framework official documentation", 3)
+    assert results and all(r.url.startswith("http") for r in results)
+    fetcher = Fetcher()
+    try:
+        page = fetcher.fetch("https://docs.djangoproject.com/en/stable/")
+    finally:
+        fetcher.close()
+    assert "Django" in page.text and page.url.startswith("https://docs.djangoproject.com/")

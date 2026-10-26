@@ -142,6 +142,8 @@ ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
 GEMINI_API_KEY = env("GEMINI_API_KEY", default="")
 DEFAULT_MODEL = env("DEFAULT_MODEL", default="")
 PROVIDER_TIMEOUT_SECONDS = env.float("PROVIDER_TIMEOUT_SECONDS", default=300.0)
+# Overrides the per-model Gemini thinking level for all Gemini models ("low", "medium", "high" or "default").
+GEMINI_THINKING_LEVEL = env("GEMINI_THINKING_LEVEL", default="")
 
 # --- Generation limits and cost controls ---
 MAX_USER_MESSAGE_CHARS = env.int("MAX_USER_MESSAGE_CHARS", default=32_000)

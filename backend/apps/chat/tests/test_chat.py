@@ -64,7 +64,7 @@ async def test_send_streams_reply_and_persists_everything(scripted):
     events = await read(await send(await logged_in(user), conv.pk, "What is RAG?"))
 
     names = [e[0] for e in events]
-    assert names == ["user_message", "start", "delta", "delta", "done"]
+    assert names == ["user_message", "start", "status", "delta", "delta", "done"]
     assert "".join(d["text"] for n, d in events if n == "delta") == "Hello, world."
     done = events[-1][1]
     assert done["input_tokens"] == 100 and done["output_tokens"] == 20
@@ -77,6 +77,9 @@ async def test_send_streams_reply_and_persists_everything(scripted):
     ]
     record = await UsageRecord.objects.aget(user=user)
     assert (record.input_tokens, record.output_tokens, record.estimated) == (100, 20, False)
+    assert events[2][1] == {"stage": "generating", "provider": "scripted"}
+    reply = msgs[1]
+    assert reply.first_token_ms is not None and reply.duration_ms >= reply.first_token_ms
     await conv.arefresh_from_db()
     assert conv.title == "What is RAG?"
     assert conv.model_id == "scripted-model"
@@ -128,7 +131,7 @@ async def test_provider_error_is_reported_and_retry_replaces_failed_reply(script
     scripted.error_after = 1
     events = await read(await send(client, conv.pk))
 
-    assert [e[0] for e in events] == ["user_message", "start", "delta", "error"]
+    assert [e[0] for e in events] == ["user_message", "start", "status", "delta", "error"]
     assert events[-1][1]["kind"] == "rate_limit" and events[-1][1]["retryable"] is True
     failed = await conv.messages.aget(role="assistant")
     assert failed.status == "error" and failed.content == "Hello"

@@ -11,7 +11,8 @@ class MessageSerializer(serializers.ModelSerializer):
         model = Message
         fields = (
             "id", "role", "content", "status", "error_kind", "error_message", "model_id", "stop_reason",
-            "input_tokens", "output_tokens", "cost_usd", "citations", "invalid_citations", "created_at",
+            "input_tokens", "output_tokens", "cost_usd", "citations", "invalid_citations", "first_token_ms",
+            "duration_ms", "created_at",
         )
         read_only_fields = fields
 

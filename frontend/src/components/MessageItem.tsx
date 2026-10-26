@@ -1,11 +1,47 @@
 import { CircleAlert, Pencil, RefreshCw, RotateCcw } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import clsx from 'clsx'
 import type { Message, ModelInfo } from '../api/types'
 import { formatCost, formatTokens } from '../lib/format'
 import { CopyButton, Markdown } from './Markdown'
 import { Sources } from './Sources'
 import { Button, IconButton } from './ui'
+
+const PROVIDER_NAMES: Record<string, string> = { gemini: 'Gemini', anthropic: 'Claude' }
+
+/** Shown while waiting for the first words, so a slow provider or web search is never a silent spinner. */
+function WaitingIndicator({ message }: { message: Message }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 500)
+    return () => clearInterval(t)
+  }, [])
+  const stage = message.stage
+  const seconds = stage ? Math.max(0, Math.floor((now - stage.since) / 1000)) : 0
+  const label =
+    stage?.stage === 'searching_web'
+      ? 'Searching the web and reading pages'
+      : stage?.stage === 'reading_documents'
+        ? 'Reading your documents'
+        : stage?.stage === 'generating'
+          ? `Waiting for ${PROVIDER_NAMES[stage.provider ?? ''] ?? 'the model'}`
+          : 'Starting'
+  return (
+    <div className="flex flex-col gap-1" role="status" aria-live="polite">
+      <div className="flex items-center gap-2 text-sm text-muted">
+        <span className="flex gap-1" aria-hidden="true">
+          {[0, 150, 300].map((d) => (
+            <span key={d} className="size-1.5 animate-bounce rounded-full bg-faint" style={{ animationDelay: `${d}ms` }} />
+          ))}
+        </span>
+        {label}…{seconds >= 2 && <span className="tabular-nums text-faint">{seconds}s</span>}
+      </div>
+      {stage?.stage === 'generating' && seconds >= 8 && (
+        <p className="text-xs text-faint">The AI provider is taking longer than usual. Free-tier models can be slow when busy.</p>
+      )}
+    </div>
+  )
+}
 
 const ERROR_HINTS: Record<string, string> = {
   quota: 'Usage limit reached',
@@ -92,11 +128,7 @@ export function MessageItem({
       {message.content ? (
         <Markdown content={message.content} />
       ) : message.status === 'streaming' ? (
-        <div className="flex h-7 items-center gap-1" aria-label="Generating reply">
-          {[0, 150, 300].map((d) => (
-            <span key={d} className="size-1.5 animate-bounce rounded-full bg-faint" style={{ animationDelay: `${d}ms` }} />
-          ))}
-        </div>
+        <WaitingIndicator message={message} />
       ) : null}
 
       {message.status === 'streaming' && message.content && (
@@ -146,6 +178,9 @@ export function MessageItem({
             </span>
           )}
           {cost && <span title="Estimated from list prices">· {cost}</span>}
+          {message.first_token_ms != null && (
+            <span title="Time until the first words appeared">· {(message.first_token_ms / 1000).toFixed(1)}s</span>
+          )}
         </div>
       )}
     </div>

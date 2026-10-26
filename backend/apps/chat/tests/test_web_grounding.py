@@ -59,6 +59,9 @@ async def test_web_search_grounds_reply_and_validates_web_citations(scripted, fa
     events = await read(await post(client, conv, "What is Ghana's policy rate?", web_search=True))
 
     assert fake_research == ["What is Ghana's policy rate?"]
+    stages = [d["stage"] for e, d in events if e == "status"]
+    assert stages == ["searching_web", "generating"]
+    assert [e for e, _ in events].index("start") < [e for e, _ in events].index("sources")
     info = next(d for e, d in events if e == "sources")
     assert [s["ref"] for s in info["web"]["sources"]] == ["W1", "W2"] and "mode" not in info
     call = scripted.calls[-1]
