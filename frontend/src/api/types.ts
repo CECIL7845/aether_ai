@@ -14,14 +14,47 @@ export type Message = {
   input_tokens: number | null
   output_tokens: number | null
   cost_usd: string | null
+  citations: SourceRef[]
+  invalid_citations: string[]
   created_at: string
+  /** Client-only: what the server reported about document grounding while streaming this reply. */
+  grounding?: GroundingInfo
 }
+
+export type SourceRef = { ref: string; document_id: number; title: string; location: string; snippet: string }
+
+export type GroundingInfo = {
+  mode: 'full' | 'search' | 'none'
+  sources: SourceRef[]
+  skipped: { title: string; status: DocumentStatus }[]
+}
+
+export type DocumentStatus = 'queued' | 'processing' | 'ready' | 'failed'
+
+export type DocumentInfo = {
+  id: number
+  title: string
+  kind: 'pdf' | 'docx' | 'text' | 'csv' | 'xlsx'
+  size: number
+  status: DocumentStatus
+  error: string
+  page_count: number | null
+  char_count: number
+  chunk_count: number
+  embedding_model: string
+  created_at: string
+  updated_at: string
+}
+
+export type AttachedDocument = Pick<DocumentInfo, 'id' | 'title' | 'kind' | 'status' | 'error'>
 
 export type Conversation = {
   id: number
   title: string
   model_id: string
   archived: boolean
+  document_ids: number[]
+  documents: AttachedDocument[]
   created_at: string
   updated_at: string
 }

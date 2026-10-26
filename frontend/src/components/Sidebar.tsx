@@ -4,6 +4,7 @@ import {
   ArchiveRestore,
   Check,
   Download,
+  FileText,
   LogOut,
   MoreHorizontal,
   PanelLeftClose,
@@ -131,6 +132,13 @@ export function Sidebar(props: Props) {
       </div>
 
       <div className="border-t border-border p-2">
+        <Link
+          to="/documents"
+          onClick={props.onNavigate}
+          className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-muted hover:bg-surface-2 hover:text-text"
+        >
+          <FileText className="size-4" /> Documents
+        </Link>
         <Link
           to="/settings"
           onClick={props.onNavigate}

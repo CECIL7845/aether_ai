@@ -26,7 +26,7 @@ cd backend
 cp .env.example .env          # then fill in the values
 uv sync
 uv run python manage.py migrate
-uv run uvicorn config.asgi:application --port 8000
+./scripts/serve_with_worker.sh   # API on :8000 + background worker (document processing)
 
 # Frontend (in another terminal); /api is proxied to :8000
 cd frontend

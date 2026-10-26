@@ -1,8 +1,9 @@
-import { Download, MessageSquareText } from 'lucide-react'
+import { Download, FileUp, MessageSquareText } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { conversations } from '../api/endpoints'
-import type { ModelsResponse } from '../api/types'
+import { conversations, documents as documentsApi } from '../api/endpoints'
+import type { AttachedDocument, DocumentInfo, ModelsResponse } from '../api/types'
+import { AttachMenu, AttachmentChips } from '../components/Attachments'
 import { Composer } from '../components/Composer'
 import { MessageItem } from '../components/MessageItem'
 import { ModelPicker } from '../components/ModelPicker'
@@ -36,6 +37,77 @@ export function ChatView({
   const scrollRef = useRef<HTMLDivElement>(null)
   const stickToBottom = useRef(true)
 
+  // Documents attached to this chat. For a new chat they are kept locally and sent when it is created.
+  const [attached, setAttached] = useState<AttachedDocument[]>([])
+  const [attachedFor, setAttachedFor] = useState<number | null>(null)
+  const [uploading, setUploading] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const [prevConversationId, setPrevConversationId] = useState(conversationId)
+  if (prevConversationId !== conversationId) {
+    // Switching chats: clear, unless this is the chat we just created from a new one (attachments carry over).
+    setPrevConversationId(conversationId)
+    if (conversationId === null || attachedFor !== conversationId) {
+      setAttachedFor(null)
+      setAttached([])
+    }
+  } else if (chat.conversation && chat.conversation.id === conversationId && attachedFor !== conversationId) {
+    setAttachedFor(conversationId)
+    setAttached(chat.conversation.documents)
+  }
+
+  const attachedRef = useRef<AttachedDocument[]>([])
+  useLayoutEffect(() => {
+    attachedRef.current = attached
+  }, [attached])
+  const persistAttachments = async (change: (list: AttachedDocument[]) => AttachedDocument[]) => {
+    const next = change(attachedRef.current)
+    attachedRef.current = next
+    setAttached(next)
+    if (conversationId !== null) {
+      try {
+        await conversations.update(conversationId, { document_ids: next.map((d) => d.id) })
+      } catch (e) {
+        toast('error', (e as Error).message)
+      }
+    }
+  }
+
+  const uploadFiles = async (files: File[]) => {
+    setUploading((n) => n + files.length)
+    const added: AttachedDocument[] = []
+    for (const file of files) {
+      try {
+        added.push(await documentsApi.upload(file))
+      } catch (e) {
+        toast('error', `${file.name}: ${(e as Error).message}`)
+      } finally {
+        setUploading((n) => n - 1)
+      }
+    }
+    if (added.length) await persistAttachments((list) => [...list, ...added])
+  }
+
+  const pick = (doc: DocumentInfo) => void persistAttachments((list) => [...list, doc])
+  const detach = (id: number) => void persistAttachments((list) => list.filter((d) => d.id !== id))
+
+  // Poll documents that are still being processed.
+  const pending = attached.filter((d) => d.status === 'queued' || d.status === 'processing').map((d) => d.id)
+  const pendingKey = pending.join(',')
+  useEffect(() => {
+    if (!pendingKey) return
+    const ids = pendingKey.split(',').map(Number)
+    const timer = setInterval(async () => {
+      const updates = await Promise.allSettled(ids.map((id) => documentsApi.get(id)))
+      setAttached((list) =>
+        list.map((d) => {
+          const u = updates.find((r) => r.status === 'fulfilled' && r.value.id === d.id)
+          return u && u.status === 'fulfilled' ? { ...d, status: u.value.status, error: u.value.error } : d
+        }),
+      )
+    }, 2000)
+    return () => clearInterval(timer)
+  }, [pendingKey])
+
   // Model: explicit choice, else the conversation's last model if still available, else the deployment default.
   const available = models?.models.filter((m) => m.available).map((m) => m.id) ?? []
   const preferred = chat.conversation?.model_id
@@ -53,8 +125,9 @@ export function ChatView({
   }, [conversationId])
 
   const ensureConversation = useCallback(async () => {
-    const created = await conversations.create(modelId)
+    const created = await conversations.create({ model_id: modelId, document_ids: attachedRef.current.map((d) => d.id) })
     setPicked({ forId: created.id, id: modelId })
+    setAttachedFor(created.id)
     navigate(`/c/${created.id}`, { replace: false })
     onChanged()
     return created.id
@@ -91,14 +164,51 @@ export function ChatView({
       onStop={chat.stop}
       streaming={chat.streaming}
       autoFocus
+      attachments={
+        <>
+          <AttachmentChips items={attached} onRemove={detach} disabled={chat.streaming} />
+          {uploading > 0 && (
+            <p className="flex items-center gap-1.5 px-4 pt-2 text-xs text-muted" role="status">
+              <Spinner className="size-3" /> Uploading {uploading} file{uploading === 1 ? '' : 's'}…
+            </p>
+          )}
+        </>
+      }
       toolbar={
-        models && <ModelPicker models={models.models} value={modelId} onChange={setModelId} disabled={chat.streaming} />
+        <>
+          <AttachMenu attachedIds={attached.map((d) => d.id)} onUpload={uploadFiles} onPick={pick} disabled={chat.streaming} />
+          {models && <ModelPicker models={models.models} value={modelId} onChange={setModelId} disabled={chat.streaming} />}
+        </>
       }
     />
   )
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div
+      className="relative flex min-h-0 flex-1 flex-col"
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes('Files')) {
+          e.preventDefault()
+          setDragging(true)
+        }
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target) setDragging(false)
+      }}
+      onDrop={(e) => {
+        e.preventDefault()
+        setDragging(false)
+        const files = Array.from(e.dataTransfer.files)
+        if (files.length) void uploadFiles(files)
+      }}
+    >
+      {dragging && (
+        <div className="pointer-events-none absolute inset-3 z-30 flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-accent bg-accent-soft/90 text-accent">
+          <FileUp className="size-8" />
+          <p className="font-medium">Drop files to attach them to this chat</p>
+          <p className="text-xs">PDF, Word, Excel, CSV, text and code files</p>
+        </div>
+      )}
       {conversationId !== null && chat.conversation && (
         <div className="flex items-center justify-end gap-1 px-4 pt-2 max-md:hidden">
           <a

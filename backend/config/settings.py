@@ -24,12 +24,15 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.postgres",
     "rest_framework",
+    "django_tasks_db",
     "apps.core",
     "apps.accounts",
     "apps.providers",
     "apps.chat",
     "apps.usage",
+    "apps.documents",
 ]
 
 MIDDLEWARE = [
@@ -148,3 +151,23 @@ USER_DAILY_TOKEN_LIMIT = env.int("USER_DAILY_TOKEN_LIMIT", default=500_000)
 USER_MONTHLY_COST_LIMIT_USD = env("USER_MONTHLY_COST_LIMIT_USD", default="10.00")
 # Empty disables the deployment-wide cap.
 GLOBAL_MONTHLY_COST_LIMIT_USD = env("GLOBAL_MONTHLY_COST_LIMIT_USD", default="")
+
+# --- Background tasks (database-backed queue; run `manage.py db_worker`) ---
+TASKS = {"default": {"BACKEND": env("TASK_BACKEND", default="django_tasks_db.DatabaseBackend")}}
+
+# --- Documents and retrieval ---
+# Uploaded files are stored privately under MEDIA_ROOT and are never served by URL; downloads go through an
+# authenticated view.
+MAX_UPLOAD_MB = env.int("MAX_UPLOAD_MB", default=20)
+MAX_DOCUMENTS_PER_USER = env.int("MAX_DOCUMENTS_PER_USER", default=200)
+MAX_STORAGE_MB_PER_USER = env.int("MAX_STORAGE_MB_PER_USER", default=500)
+MAX_PDF_PAGES = env.int("MAX_PDF_PAGES", default=600)
+MAX_EXTRACTED_CHARS = env.int("MAX_EXTRACTED_CHARS", default=3_000_000)
+MAX_UNCOMPRESSED_MB = env.int("MAX_UNCOMPRESSED_MB", default=200)  # zip-bomb guard for DOCX/XLSX
+MAX_SPREADSHEET_ROWS = env.int("MAX_SPREADSHEET_ROWS", default=100_000)
+EMBEDDING_PROVIDER = env("EMBEDDING_PROVIDER", default="gemini")  # "gemini" or "none" (keyword search only)
+EMBEDDING_MODEL = env("EMBEDDING_MODEL", default="gemini-embedding-001")
+EMBEDDING_DIMENSIONS = 768  # fixed by the database column; changing it requires a migration and re-indexing
+# Attached documents up to this size are sent to the model in full; larger ones use retrieval.
+FULL_CONTEXT_MAX_CHARS = env.int("FULL_CONTEXT_MAX_CHARS", default=60_000)
+RETRIEVAL_TOP_K = env.int("RETRIEVAL_TOP_K", default=8)

@@ -11,6 +11,7 @@ import { useAuth } from '../lib/auth'
 import type { ThemeChoice } from '../lib/theme'
 import { useToast } from '../lib/toast'
 import { ChatView } from './ChatView'
+import { DocumentsView } from './DocumentsView'
 import { SettingsView } from './SettingsView'
 
 export function Workspace({ theme, setTheme }: { theme: ThemeChoice; setTheme: (t: ThemeChoice) => void }) {
@@ -19,6 +20,7 @@ export function Workspace({ theme, setTheme }: { theme: ThemeChoice; setTheme: (
   const navigate = useNavigate()
   const chatMatch = useMatch('/c/:id')
   const settingsMatch = useMatch('/settings')
+  const documentsMatch = useMatch('/documents')
   const activeId = chatMatch ? Number(chatMatch.params.id) : null
 
   const [items, setItems] = useState<Conversation[]>([])
@@ -147,6 +149,8 @@ export function Workspace({ theme, setTheme }: { theme: ThemeChoice; setTheme: (
 
         {settingsMatch ? (
           <SettingsView theme={theme} setTheme={setTheme} models={models} />
+        ) : documentsMatch ? (
+          <DocumentsView />
         ) : (
           <ChatView conversationId={activeId} models={models} onTitle={onTitle} onChanged={refresh} />
         )}

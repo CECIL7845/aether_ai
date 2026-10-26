@@ -92,3 +92,40 @@ def scripted(settings):
     MODELS.remove(SCRIPTED_SPEC)
     _BY_ID.pop(SCRIPTED_SPEC.id, None)
     _PROVIDERS.pop("scripted", None)
+
+
+# ---------------------------------------------------------------------------
+# TEST FIXTURE ONLY: deterministic bag-of-words "embedder" so vector retrieval can be tested offline.
+# Real embeddings (Gemini) are exercised by the live tests.
+# ---------------------------------------------------------------------------
+import hashlib  # noqa: E402
+import math  # noqa: E402
+import re  # noqa: E402
+
+from apps.providers.embeddings import set_embedder_override  # noqa: E402
+
+
+class HashingEmbedder:
+    model = "test-hashing-embedder"
+
+    def __init__(self):
+        self.calls = 0
+
+    def embed(self, texts, task):
+        self.calls += 1
+        out = []
+        for text in texts:
+            v = [0.0] * 768
+            for word in re.findall(r"[a-z0-9]+", text.lower()):
+                v[int(hashlib.sha256(word.encode()).hexdigest(), 16) % 768] += 1.0
+            norm = math.sqrt(sum(x * x for x in v)) or 1.0
+            out.append([x / norm for x in v])
+        return out
+
+
+@pytest.fixture
+def embedder():
+    e = HashingEmbedder()
+    set_embedder_override(e)
+    yield e
+    set_embedder_override(None)

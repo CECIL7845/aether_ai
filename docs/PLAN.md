@@ -1,6 +1,6 @@
 # Aether — Implementation Plan and Architecture
 
-Status: Phases 1–4 are complete. Last updated 2026-10-26.
+Status: Phases 1–5 are complete. Last updated 2026-10-26.
 "Aether" is a provisional name. Its availability has **not** been checked yet; that check happens in Phase 12. The name is configurable through `PRODUCT_NAME`.
 
 ## 1. Commercial reality (read first)
@@ -59,8 +59,8 @@ Key decisions:
 | Backend | Django 6.1 + DRF on ASGI | Matches the developer's skills; the admin, migrations and auth come with the framework. Async views stream SSE without Channels. |
 | Auth for the SPA | Session cookie + CSRF, Argon2 hashes | Keeps tokens out of browser storage (prevents token theft via XSS). Login and register are CSRF-protected explicitly. |
 | Vector store | pgvector inside Postgres | One database to back up and operate. Hybrid retrieval with Postgres full-text search. |
-| Jobs | django-tasks DB backend (verify in Phase 5) | Avoids a Redis dependency for self-hosters. Can be swapped for Celery later. |
-| Embeddings | Decide in Phase 5: a local ONNX model (no extra key, data stays local) vs. a provider API | Anthropic has no embeddings endpoint, so this choice is separate from the chat provider. |
+| Jobs | Django 6 built-in Tasks + `django-tasks-db` (BSD) database backend; worker = `manage.py db_worker` | No Redis needed for self-hosters. |
+| Embeddings | Gemini `gemini-embedding-001` at 768 dimensions (pluggable; `EMBEDDING_PROVIDER=none` gives keyword-only search) | Anthropic has no embeddings endpoint. Hybrid search (pgvector cosine + Postgres full-text, reciprocal-rank fusion) still works without embeddings. |
 | Code execution | **Not in MVP** | Running arbitrary code safely needs a hardened sandbox. Coding help is explain, review and generate only. |
 | Data analysis | Allow-listed operations (describe, filter, group-by, aggregate, chart spec) on pandas/DuckDB | No user or model code is executed, and every result is deterministic. |
 | Web search | Search API (Brave/Tavily, verify terms and pricing in Phase 6); Claude's server-side `web_search` when using Claude | Citations are restricted to URLs actually fetched. |
@@ -79,7 +79,7 @@ Later: image generation, organisations and multi-tenant hosting, user memory, PD
 | 2 | Environment and setup | Backend + frontend run; health check proves DB + pgvector; tests and lint green ✅ |
 | 3 | Conversation engine + providers | A real streamed reply is persisted; provider errors and 429s are handled; usage is recorded ✅ (verified live with Gemini; the Anthropic adapter is written but untested until a key is added) |
 | 4 | UI and conversation management | Every conversation feature works end-to-end in a browser test, on desktop and mobile ✅ (Playwright, real Gemini) |
-| 5 | Documents | Upload → extract → chunk → embed → cited answer; malformed, oversized and encrypted files are rejected with a clear message |
+| 5 | Documents | Upload → extract → chunk → embed → cited answer; malformed, oversized and encrypted files are rejected with a clear message ✅ |
 | 6 | Web research | Answers cite only fetched URLs; SSRF protections are tested |
 | 7 | Coding + data analysis | Dataset Q&A returns numbers computed by tools, checked against known fixtures |
 | 8 | Images + tools | Tool permissions are enforced server-side; consequential actions need confirmation |
@@ -109,3 +109,11 @@ Example assumption to test in Phase 9: 1 user × 30 messages/day × (3K input + 
 - Product name and trademark check.
 - Licence terms for OpenAI and Google APIs, and for any search API, before their adapters are built.
 - Envato/CodeCanyon author eligibility for Ghana is unverified. Lemon Squeezy lists Ghana for bank payouts.
+
+## 9. Document intelligence (as built)
+
+- **Upload checks:** the extension is allow-listed, the file's real signature must match it, there are size, count and storage limits, and filenames are sanitised. Files are stored under random names and are never served by URL; downloads go through an authenticated view as `application/octet-stream`.
+- **Extraction:** PDF (pypdf, keeping page numbers), DOCX (headings and tables), XLSX (cached values only, so formulas are never evaluated), CSV, and text/code files. The following fail with an explicit reason: password-protected PDFs, scanned PDFs with no text (OCR not supported), zip bombs, damaged files, and files over the page or character limits.
+- **Grounding:** if all attached documents total ≤ `FULL_CONTEXT_MAX_CHARS`, they are sent in full; otherwise the top-k hybrid search results are sent. Excerpts are numbered `[S1]…` inside `<documents>` tags. Document text cannot close those tags. The system prompt tells the model to treat document content as untrusted data.
+- **Citation checks:** after a reply, citations are checked against the sources actually supplied. Valid ones are stored and shown with their snippets. Invalid ones (for example `[S9]` when only S1–S2 were given) are flagged in the UI as possible fabrications.
+- **Known limits:** no OCR; no image understanding inside documents; source snippets show the chunk, not a highlighted span; prompt-injection resistance relies on delimiting plus instructions and is not a guarantee.

@@ -85,3 +85,14 @@ def test_usage_endpoint(client):
 def test_conversation_endpoints_require_auth(api):
     assert api.get("/api/conversations/").status_code == 403
     assert api.get("/api/models/").status_code == 403
+
+
+def test_attach_and_detach_documents(client, user):
+    from apps.documents.models import Document
+
+    doc = Document.objects.create(user=user, title="a.pdf", kind="pdf", size=1, sha256="x", status="ready")
+    conv = client.post("/api/conversations/", {"document_ids": [doc.pk]}, format="json").json()
+    assert conv["document_ids"] == [doc.pk]
+    assert conv["documents"][0]["title"] == "a.pdf"
+    r = client.patch(f"/api/conversations/{conv['id']}/", {"document_ids": []}, format="json")
+    assert r.json()["document_ids"] == []

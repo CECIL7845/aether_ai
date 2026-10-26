@@ -4,6 +4,7 @@ import clsx from 'clsx'
 import type { Message, ModelInfo } from '../api/types'
 import { formatCost, formatTokens } from '../lib/format'
 import { CopyButton, Markdown } from './Markdown'
+import { Sources } from './Sources'
 import { Button, IconButton } from './ui'
 
 const ERROR_HINTS: Record<string, string> = {
@@ -116,6 +117,8 @@ export function MessageItem({
           )}
         </div>
       )}
+
+      {message.status !== 'streaming' && <Sources message={message} />}
 
       {message.status === 'stopped' && (
         <p className="mt-2 text-xs text-faint">

@@ -19,7 +19,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
     serializer_class = ConversationSerializer
 
     def get_queryset(self):
-        qs = Conversation.objects.filter(user=self.request.user)
+        qs = Conversation.objects.filter(user=self.request.user).prefetch_related("documents")
         archived = self.request.query_params.get("archived")
         if archived in ("true", "false"):
             qs = qs.filter(archived=archived == "true")

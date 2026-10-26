@@ -16,7 +16,7 @@ from apps.providers.base import ProviderError
 from apps.providers.registry import get_model
 from apps.usage.models import UsageLimit, UsageRecord
 
-pytestmark = [pytest.mark.asyncio, pytest.mark.django_db(transaction=True)]
+pytestmark = pytest.mark.django_db(transaction=True)
 
 
 @pytest_asyncio.fixture(autouse=True)

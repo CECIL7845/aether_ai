@@ -14,7 +14,10 @@ def test_register_logs_in_and_returns_user(csrf_api):
     assert csrf_api.get("/api/auth/me/").status_code == 200
 
 
-def test_password_is_hashed_with_argon2(csrf_api):
+def test_password_is_hashed_with_argon2(csrf_api, settings):
+    from config import settings as production
+
+    settings.PASSWORD_HASHERS = production.PASSWORD_HASHERS  # tests default to a fast hasher
     csrf_api.post("/api/auth/register/", {"email": "a@example.com", "password": STRONG})
     assert User.objects.get(email="a@example.com").password.startswith("argon2")
 

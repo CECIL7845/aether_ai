@@ -12,4 +12,5 @@ urlpatterns = [
     path("api/models/", ModelListView.as_view()),
     path("api/usage/me/", MyUsageView.as_view()),
     path("api/", include("apps.chat.urls")),
+    path("api/", include("apps.documents.urls")),
 ]

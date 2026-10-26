@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, postStream, type SSEEvent } from '../api/client'
 import { conversations } from '../api/endpoints'
-import type { ConversationDetail, Message } from '../api/types'
+import type { ConversationDetail, GroundingInfo, Message, SourceRef } from '../api/types'
 
 let tempId = -1
 const nextTempId = () => tempId--
@@ -19,6 +19,8 @@ function draft(role: Message['role'], content: string, status: Message['status']
     input_tokens: null,
     output_tokens: null,
     cost_usd: null,
+    citations: [],
+    invalid_citations: [],
     created_at: new Date().toISOString(),
   }
 }
@@ -96,6 +98,8 @@ export function useChat(conversationId: number | null, { onTitle, onChanged }: O
           const realId = data.assistant_message_id as number
           patch(assistantId, { id: realId, model_id: data.model_id as string })
           assistantId = realId
+        } else if (event === 'sources') {
+          patch(assistantId, { grounding: data as unknown as GroundingInfo })
         } else if (event === 'delta') {
           patch(assistantId, (m) => ({ content: m.content + (data.text as string) }))
         } else if (event === 'done') {
@@ -108,6 +112,8 @@ export function useChat(conversationId: number | null, { onTitle, onChanged }: O
             stop_reason: data.stop_reason as string,
             error_kind: (data.error_kind as string) ?? '',
             error_message: (data.error_message as string) ?? '',
+            citations: (data.citations as SourceRef[]) ?? [],
+            invalid_citations: (data.invalid_citations as string[]) ?? [],
           })
         } else if (event === 'error') {
           patch(assistantId, {

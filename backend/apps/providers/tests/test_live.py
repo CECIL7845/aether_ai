@@ -14,9 +14,16 @@ from apps.providers.registry import MODELS
 from apps.providers.services import get_provider
 
 pytestmark = [
-    pytest.mark.asyncio,
     pytest.mark.skipif(os.environ.get("RUN_LIVE_TESTS") != "1", reason="set RUN_LIVE_TESTS=1 to call real APIs"),
 ]
+
+
+@pytest.fixture(autouse=True)
+def _real_keys(settings):
+    """Unit-test settings blank the API keys; live tests put the real ones back."""
+    settings.GEMINI_API_KEY = settings.LIVE_API_KEYS["gemini"]
+    settings.ANTHROPIC_API_KEY = settings.LIVE_API_KEYS["anthropic"]
+    settings.EMBEDDING_PROVIDER = "gemini"
 
 
 def _first_model(provider: str) -> str:
@@ -53,4 +60,20 @@ async def test_unknown_model_maps_to_not_found(provider_name):
                                        system="", max_output_tokens=16):
             pass
     assert info.value.kind in ("not_found", "bad_request")
-    assert settings.GEMINI_API_KEY not in str(info.value)  # keys never leak into error messages
+    assert not settings.GEMINI_API_KEY or settings.GEMINI_API_KEY not in str(info.value)  # no key leaks
+
+
+def test_gemini_embeddings_rank_the_relevant_text_first():
+    from apps.providers.embeddings import GeminiEmbedder
+
+    if not settings.GEMINI_API_KEY:
+        pytest.skip("gemini has no API key configured")
+    embedder = GeminiEmbedder()
+    docs = embedder.embed(
+        ["Shipping to Tamale takes four working days.", "Our refund policy allows returns within 30 days."],
+        "document",
+    )
+    [query] = embedder.embed(["How long is delivery to Tamale?"], "query")
+    scores = [sum(a * b for a, b in zip(query, d, strict=True)) for d in docs]
+    assert len(docs[0]) == settings.EMBEDDING_DIMENSIONS
+    assert scores[0] > scores[1]

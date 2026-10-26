@@ -10,6 +10,7 @@ export function Composer({
   streaming,
   disabled,
   toolbar,
+  attachments,
   autoFocus,
 }: {
   onSend: (text: string) => Promise<string | null | undefined> | void
@@ -17,6 +18,7 @@ export function Composer({
   streaming: boolean
   disabled?: boolean
   toolbar?: ReactNode
+  attachments?: ReactNode
   autoFocus?: boolean
 }) {
   const [text, setText] = useState('')
@@ -43,6 +45,7 @@ export function Composer({
 
   return (
     <div className="rounded-2xl border border-border bg-surface shadow-card focus-within:border-accent/70 focus-within:ring-3 focus-within:ring-accent/15">
+      {attachments}
       <label htmlFor="composer" className="sr-only">
         Message
       </label>

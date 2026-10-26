@@ -17,6 +17,7 @@ from apps.providers.services import get_provider
 from apps.usage.models import UsageRecord
 from apps.usage.services import check_quota
 
+from .grounding import GROUNDING_INSTRUCTIONS, check_citations, ground
 from .models import Conversation, Message
 
 logger = logging.getLogger(__name__)
@@ -99,24 +100,29 @@ async def generate_reply(user, conversation: Conversation, spec: ModelSpec) -> A
         return
 
     history = await build_history(conversation, settings.MAX_CONTEXT_TOKENS)
+    history, sources, grounding = await ground(user, conversation, history)
+    system = system_prompt() + (GROUNDING_INSTRUCTIONS if grounding else "")
     assistant = await Message.objects.acreate(
         conversation=conversation, role=Message.Role.ASSISTANT, status=Message.Status.STREAMING, model_id=spec.id
     )
     parts: list[str] = []
     try:
         yield sse("start", {"assistant_message_id": assistant.pk, "model_id": spec.id})
+        if grounding:
+            yield sse("sources", grounding)
         if not history:
             raise ProviderError("bad_request", "There is no user message to reply to.", spec.provider)
 
         provider = get_provider(spec.provider)
         max_out = min(settings.MAX_OUTPUT_TOKENS, spec.max_output_tokens)
         async for event in provider.stream(
-            model_id=spec.id, messages=history, system=system_prompt(), max_output_tokens=max_out
+            model_id=spec.id, messages=history, system=system, max_output_tokens=max_out
         ):
             if isinstance(event, TextDelta):
                 parts.append(event.text)
                 yield sse("delta", {"text": event.text})
             elif isinstance(event, StreamDone):
+                assistant.citations, assistant.invalid_citations = check_citations("".join(parts), sources)
                 await _finish(user, conversation, assistant, spec, "".join(parts), event)
                 yield sse("done", _message_summary(assistant))
     except ProviderError as e:
@@ -193,6 +199,8 @@ def _message_summary(m: Message) -> dict:
         "cost_usd": str(m.cost_usd) if m.cost_usd is not None else None,
         "error_kind": m.error_kind,
         "error_message": m.error_message,
+        "citations": m.citations,
+        "invalid_citations": m.invalid_citations,
     }
 
 

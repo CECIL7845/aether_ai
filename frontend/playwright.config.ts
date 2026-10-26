@@ -19,7 +19,7 @@ export default defineConfig({
   webServer: [
     {
       // E2E registers many users from one IP, so the auth rate limit is raised for the test server only.
-      command: 'THROTTLE_AUTH=200/min DEFAULT_MODEL=${E2E_MODEL:-gemini-3.5-flash-lite} uv run uvicorn config.asgi:application --port 8000',
+      command: 'THROTTLE_AUTH=200/min DEFAULT_MODEL=${E2E_MODEL:-gemini-3.5-flash-lite} ./scripts/serve_with_worker.sh',
       cwd: '../backend',
       url: 'http://localhost:8000/api/health/',
       reuseExistingServer: false,
